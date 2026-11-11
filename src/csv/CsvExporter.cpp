@@ -5,13 +5,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 
-CsvExporter::CsvExporter(QSqlDatabase db)
-    : m_db(db)
-{
-}
+CsvExporter::CsvExporter(QSqlDatabase db): m_db(db){}
 
-bool CsvExporter::exportClients(const QString &filePath,
-                                QString &errorMessage)
+bool CsvExporter::exportClients(const QString &filePath, QString &errorMessage)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {

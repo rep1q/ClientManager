@@ -8,8 +8,7 @@ class ExportWorker : public QObject
 {
     Q_OBJECT
 public:
-    explicit ExportWorker(const QString &dbPath,
-                          const QString &filePath);
+    explicit ExportWorker(const QString &dbPath,const QString &filePath);
 public slots:
     void run();
 signals:

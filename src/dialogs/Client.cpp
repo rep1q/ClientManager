@@ -70,8 +70,7 @@ void Client::loadStatuses()
 {
     statusComboBox->addItem("Выберите статус", QVariant());
     QSqlQuery query(m_db);
-    if (!query.exec(
-            "SELECT id, name FROM client_statuses ORDER BY id")) {
+    if (!query.exec("SELECT id, name FROM client_statuses ORDER BY id")) {
         qDebug() << "Statuses error:" << query.lastError().text();
         return;
     }
@@ -87,30 +86,15 @@ void Client::saveClient()
         return;
     QSqlQuery query(m_db);
     if (!prepareClientQuery(query)) {
-        QMessageBox::critical(
-            this,
-            "Ошибка базы данных",
-            query.lastError().text()
-            );
+        QMessageBox::critical(this, "Ошибка базы данных",query.lastError().text());
         return;
     }
     bindClientValues(query);
     if (!query.exec()) {
-        QMessageBox::critical(
-            this,
-            "Ошибка базы данных",
-            query.lastError().text()
-            );
+        QMessageBox::critical(this, "Ошибка базы данных", query.lastError().text());
         return;
     }
-    QMessageBox::information(
-        this,
-        "Успешно",
-        m_clientId == -1
-            ? "Клиент добавлен."
-            : "Данные клиента обновлены."
-        );
-
+    QMessageBox::information(this, "Успешно", m_clientId == -1 ? "Клиент добавлен." : "Данные клиента обновлены." );
     accept();
 }
 
@@ -123,20 +107,12 @@ void Client::loadClient(int clientId)
         );
     query.bindValue(":id", clientId);
     if (!query.exec()) {
-        QMessageBox::critical(
-            this,
-            "Ошибка SQL",
-            query.lastError().text()
-            );
+        QMessageBox::critical(this, "Ошибка SQL", query.lastError().text());
         reject();
         return;
     }
     if (!query.next()) {
-        QMessageBox::critical(
-            this,
-            "Ошибка",
-            "Клиент с таким ID не найден."
-            );
+        QMessageBox::critical(this, "Ошибка", "Клиент с таким ID не найден.");
         reject();
         return;
     }
@@ -146,19 +122,11 @@ void Client::loadClient(int clientId)
 bool Client::validateForm()
 {
     if (nameEdit->text().trimmed().isEmpty()) {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "Введите имя клиента."
-            );
+        QMessageBox::warning(this,"Ошибка","Введите имя клиента.");
         return false;
     }
     if (!statusComboBox->currentData().isValid()) {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "Выберите статус клиента."
-            );
+        QMessageBox::warning(this,"Ошибка","Выберите статус клиента.");
         return false;
     }
     return true;

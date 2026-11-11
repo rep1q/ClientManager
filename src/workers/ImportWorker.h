@@ -7,20 +7,12 @@
 class ImportWorker : public QObject
 {
     Q_OBJECT
-
 public:
-    explicit ImportWorker(const QString &dbPath,
-                          const QString &filePath);
-
+    explicit ImportWorker(const QString &dbPath, const QString &filePath);
 public slots:
     void run();
-
 signals:
-    void finished(bool success,
-                  const QString &message,
-                  int importedCount,
-                  int skippedCount);
-
+    void finished(bool success, const QString &message, int importedCount, int skippedCount);
 private:
     QString m_dbPath;
     QString m_filePath;

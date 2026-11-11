@@ -9,9 +9,7 @@ class DatabaseManager
 public:
     bool connect();
     bool initSchema();
-
     QSqlDatabase db() const;
-
     static QString databasePath();
 private:
     bool executeSchema(const QString &schema);

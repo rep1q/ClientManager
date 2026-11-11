@@ -114,62 +114,25 @@ void MainWindow::exportClients()
         "clients.csv",
         "CSV files (*.csv)"
         );
-    // Если пользователь отменил выбор
     if (filePath.isEmpty())
         return;
-
-    // Создаём поток
     QThread *thread = new QThread(this);
-
-    // Создаём рабочего исполнителя
     ExportWorker *worker = new ExportWorker(
         DatabaseManager::databasePath(),
         filePath
         );
-
-    // Перемещаем исполнителя в отдельный поток
     worker->moveToThread(thread);
-
-    // Запускаем работу при старте потока
-    connect(thread, &QThread::started,
-            worker, &ExportWorker::run);
-
-    // Получаем результат работы
-    connect(worker, &ExportWorker::finished,
-            this,
-            [this](bool success, const QString &message)
-            {
-                if (success) {
-                    QMessageBox::information(
-                        this,
-                        "Экспорт",
-                        message
-                        );
-                }
-                else {
-                    QMessageBox::warning(
-                        this,
-                        "Ошибка экспорта",
-                        message
-                        );
-                }
+    connect(thread, &QThread::started, worker, &ExportWorker::run);
+    connect(worker, &ExportWorker::finished,this,[this](bool success, const QString &message){
+                if (success)
+                    QMessageBox::information(this,"Экспорт",message);
+                else
+                    QMessageBox::warning(this,"Ошибка экспорта",message);
             });
-
-    // После завершения работы останавливаем поток
-    connect(worker, &ExportWorker::finished,
-            thread, &QThread::quit);
-
-    // Удаляем worker после завершения потока
-    connect(thread, &QThread::finished,
-            worker, &QObject::deleteLater);
-
-    // Удаляем объект потока
-    connect(thread, &QThread::finished,
-            thread, &QObject::deleteLater);
-
-    // Запускаем
+    connect(worker, &ExportWorker::finished,thread, &QThread::quit);
+    connect(thread, &QThread::finished,worker, &QObject::deleteLater);
+    connect(thread, &QThread::finished,thread, &QObject::deleteLater);
     thread->start();
-
 }
 
 void MainWindow::importClients()
@@ -182,86 +145,42 @@ void MainWindow::importClients()
         );
     if (filePath.isEmpty())
         return;
-
     QThread *thread = new QThread(this);
-
     ImportWorker *worker = new ImportWorker(
         DatabaseManager::databasePath(),
         filePath
         );
-
     worker->moveToThread(thread);
-
-    connect(thread, &QThread::started,
-            worker, &ImportWorker::run);
-
-    connect(worker, &ImportWorker::finished,
-            this,
-            [this](bool success,
-                   const QString &message,
-                   int importedCount,
-                   int skippedCount)
-            {
+    connect(thread, &QThread::started,worker, &ImportWorker::run);
+    connect(worker, &ImportWorker::finished,this,[this](bool success,const QString &message,int importedCount,int skippedCount){
                 Q_UNUSED(importedCount);
                 Q_UNUSED(skippedCount);
-
                 if (success) {
-                    // Обновляем таблицу после импорта
                     clientModel->select();
-
-                    QMessageBox::information(
-                        this,
-                        "Импорт CSV",
-                        message
-                        );
+                    QMessageBox::information(this,"Импорт CSV",message);
                 }
-                else {
-                    QMessageBox::warning(
-                        this,
-                        "Ошибка импорта",
-                        message
-                        );
-                }
+                else
+                    QMessageBox::warning(this,"Ошибка импорта",message);
             });
 
-    connect(worker, &ImportWorker::finished,
-            thread, &QThread::quit);
+    connect(worker, &ImportWorker::finished,thread, &QThread::quit);
+    connect(thread, &QThread::finished,worker, &QObject::deleteLater);
 
-    connect(thread, &QThread::finished,
-            worker, &QObject::deleteLater);
-
-    connect(thread, &QThread::finished,
-            thread, &QObject::deleteLater);
-
+    connect(thread, &QThread::finished,thread, &QObject::deleteLater);
     thread->start();
-
 }
 
 void MainWindow::setupModel()
 {
     clientModel = new QSqlRelationalTableModel(this);
-
     clientModel->setTable("clients");
-
-    clientModel->setRelation(
-        5, QSqlRelation("cities", "id", "name")
-        );
-
-    clientModel->setRelation(
-        6, QSqlRelation("client_statuses", "id", "name")
-        );
-
+    clientModel->setRelation(5, QSqlRelation("cities", "id", "name"));
+    clientModel->setRelation(6, QSqlRelation("client_statuses", "id", "name"));
     clientModel->setEditStrategy(QSqlTableModel::OnManualSubmit);
-
     if (!clientModel->select()) {
-        QMessageBox::critical(
-            this,
-            "Ошибка базы данных",
-            clientModel->lastError().text()
-            );
+        QMessageBox::critical(this,"Ошибка базы данных",clientModel->lastError().text());
         return;
     }
-
     clientModel->setHeaderData(0, Qt::Horizontal, "ID");
     clientModel->setHeaderData(1, Qt::Horizontal, "Имя");
     clientModel->setHeaderData(2, Qt::Horizontal, "Телефон");
@@ -274,30 +193,13 @@ void MainWindow::setupModel()
 void MainWindow::setupTableView()
 {
     tableView = new QTableView(this);
-
     tableView->setModel(clientModel);
-
-    tableView->setItemDelegate(
-        new QSqlRelationalDelegate(tableView)
-        );
-
+    tableView->setItemDelegate(new QSqlRelationalDelegate(tableView));
     tableView->setSortingEnabled(true);
-
-    tableView->setSelectionBehavior(
-        QAbstractItemView::SelectRows
-        );
-
-    tableView->setSelectionMode(
-        QAbstractItemView::SingleSelection
-        );
-
-    tableView->setEditTriggers(
-        QAbstractItemView::NoEditTriggers
-        );
-
-    tableView->horizontalHeader()->setSectionResizeMode(
-        QHeaderView::Stretch
-        );
+    tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 }
 
 MainWindow::~MainWindow()

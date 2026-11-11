@@ -9,138 +9,88 @@
 
 namespace
 {
-
-    // Разбираем CSV с поддержкой кавычек и переносов строк
-    bool parseCsv(const QString &content,
-                  QVector<QStringList> &rows,
-                  QString &errorMessage)
+    // CSV с поддержкой кавычек и переносов строк
+    bool parseCsv(const QString &content,QVector<QStringList> &rows, QString &errorMessage)
     {
         QStringList row;
         QString field;
-
         bool insideQuotes = false;
-
         for (int i = 0; i < content.size(); ++i) {
             QChar ch = content[i];
-
             if (insideQuotes) {
-
                 if (ch == '"') {
-
                     // Двойная кавычка внутри значения
-                    if (i + 1 < content.size()
-                        && content[i + 1] == '"') {
-
+                    if (i + 1 < content.size() && content[i + 1] == '"') {
                         field += '"';
                         ++i;
                     }
-                    else {
+                    else
                         insideQuotes = false;
-                    }
                 }
-                else {
+                else
                     field += ch;
-                }
-
             }
             else {
-
                 if (ch == '"') {
-
                     if (!field.isEmpty()) {
                         errorMessage = "Некорректное расположение кавычек";
                         return false;
                     }
-
                     insideQuotes = true;
                 }
-
                 else if (ch == ',') {
                     row.append(field);
                     field.clear();
                 }
-
                 else if (ch == '\n' || ch == '\r') {
-
                     row.append(field);
                     field.clear();
-
                     rows.append(row);
                     row.clear();
-
-                    // Пропускаем второй символ CRLF
-                    if (ch == '\r'
-                        && i + 1 < content.size()
-                        && content[i + 1] == '\n') {
+                    // Пропускаем второй символ
+                    if (ch == '\r' && i + 1 < content.size() && content[i + 1] == '\n')
                         ++i;
-                    }
                 }
-
-                else {
+                else
                     field += ch;
-                }
             }
         }
-
         if (insideQuotes) {
             errorMessage = "Незакрытая кавычка в CSV-файле";
             return false;
         }
-
         // Добавляем последнюю строку
         if (!field.isEmpty() || !row.isEmpty()) {
             row.append(field);
             rows.append(row);
         }
-
         return true;
     }
-
 }
 
-CsvImporter::CsvImporter(QSqlDatabase db)
-    : m_db(db)
-{
-}
+CsvImporter::CsvImporter(QSqlDatabase db): m_db(db){}
 
-bool CsvImporter::importClients(const QString &filePath,
-                                QString &errorMessage,
-                                int &importedCount,
-                                int &skippedCount)
+bool CsvImporter::importClients(const QString &filePath, QString &errorMessage, int &importedCount, int &skippedCount)
 {
     importedCount = 0;
     skippedCount = 0;
-
-    // Открываем CSV
     QFile file(filePath);
-
     if (!file.open(QIODevice::ReadOnly)) {
         errorMessage = file.errorString();
         return false;
     }
-
     QString content = QString::fromUtf8(file.readAll());
-
     file.close();
-
-    // Убираем UTF-8 BOM, если он присутствует
     if (content.startsWith(QChar(0xFEFF))) {
         content.remove(0, 1);
     }
-
-    // Разбираем CSV
     QVector<QStringList> rows;
-
-    if (!parseCsv(content, rows, errorMessage)) {
+    if (!parseCsv(content, rows, errorMessage))
         return false;
-    }
-
     if (rows.isEmpty()) {
         errorMessage = "CSV-файл пуст";
         return false;
     }
-
-    // Проверяем заголовки
     QStringList expectedHeader = {
         "name",
         "phone",
@@ -149,181 +99,115 @@ bool CsvImporter::importClients(const QString &filePath,
         "city",
         "status"
     };
-
     if (rows[0] != expectedHeader) {
         errorMessage = "Неверный формат CSV-файла";
         return false;
     }
-
-    // Начинаем транзакцию
     if (!m_db.transaction()) {
         errorMessage = m_db.lastError().text();
         return false;
     }
-
-    // Запрос для поиска города
     QSqlQuery cityQuery(m_db);
-
-    cityQuery.prepare(
-        "SELECT id FROM cities WHERE name = :name"
-        );
-
-    // Запрос для поиска статуса
+    cityQuery.prepare("SELECT id FROM cities WHERE name = :name");
     QSqlQuery statusQuery(m_db);
-
-    statusQuery.prepare(
-        "SELECT id FROM client_statuses WHERE name = :name"
-        );
-
-    // Проверка дубликатов
+    statusQuery.prepare("SELECT id FROM client_statuses WHERE name = :name");
     QSqlQuery duplicateQuery(m_db);
-
     duplicateQuery.prepare(
         "SELECT 1 FROM clients "
         "WHERE phone = :phone OR email = :email "
         "LIMIT 1"
         );
-
-    // Добавление клиента
     QSqlQuery insertQuery(m_db);
-
     insertQuery.prepare(
         "INSERT INTO clients "
         "(name, phone, email, age, city_id, status_id) "
         "VALUES "
         "(:name, :phone, :email, :age, :city_id, :status_id)"
         );
-
-    // Обрабатываем строки
     for (int i = 1; i < rows.size(); ++i) {
-
         QStringList fields = rows[i];
-
-        // Пустые строки пропускаем
-        if (fields.size() == 1 && fields[0].trimmed().isEmpty()) {
+        if (fields.size() == 1 && fields[0].trimmed().isEmpty())
             continue;
-        }
-
-        // В каждой строке должно быть 6 столбцов
         if (fields.size() != 6) {
             ++skippedCount;
             continue;
         }
-
         QString name = fields[0].trimmed();
         QString phone = fields[1].trimmed();
         QString email = fields[2].trimmed();
         QString ageText = fields[3].trimmed();
         QString city = fields[4].trimmed();
         QString status = fields[5].trimmed();
-
-        // Проверяем обязательные поля
         if (name.isEmpty() || status.isEmpty()) {
             ++skippedCount;
             continue;
         }
-
-        // Проверяем возраст
         QVariant ageValue;
-
         if (!ageText.isEmpty()) {
-
             bool ok = false;
             int age = ageText.toInt(&ok);
-
             if (!ok || age < 0 || age > 99) {
                 ++skippedCount;
                 continue;
             }
-
             ageValue = age;
         }
-
-        // Ищем город
         QVariant cityId;
-
         if (!city.isEmpty()) {
-
             cityQuery.bindValue(":name", city);
-
             if (!cityQuery.exec()) {
                 errorMessage = cityQuery.lastError().text();
                 m_db.rollback();
                 return false;
             }
-
             if (!cityQuery.next()) {
                 ++skippedCount;
                 continue;
             }
-
             cityId = cityQuery.value(0);
         }
-
-        // Ищем статус
         statusQuery.bindValue(":name", status);
-
         if (!statusQuery.exec()) {
             errorMessage = statusQuery.lastError().text();
             m_db.rollback();
             return false;
         }
-
         if (!statusQuery.next()) {
             ++skippedCount;
             continue;
         }
-
         int statusId = statusQuery.value(0).toInt();
+        duplicateQuery.bindValue(":phone", phone.isEmpty() ? QVariant() : QVariant(phone));
 
-        // Проверяем дубликаты телефона и email
-        duplicateQuery.bindValue(":phone",
-                                 phone.isEmpty() ? QVariant() : QVariant(phone));
-
-        duplicateQuery.bindValue(":email",
-                                 email.isEmpty() ? QVariant() : QVariant(email));
+        duplicateQuery.bindValue(":email", email.isEmpty() ? QVariant() : QVariant(email));
 
         if (!duplicateQuery.exec()) {
             errorMessage = duplicateQuery.lastError().text();
             m_db.rollback();
             return false;
         }
-
         if (duplicateQuery.next()) {
             ++skippedCount;
             continue;
         }
-
-        // Добавляем клиента
         insertQuery.bindValue(":name", name);
-
-        insertQuery.bindValue(":phone",
-                              phone.isEmpty() ? QVariant() : QVariant(phone));
-
-        insertQuery.bindValue(":email",
-                              email.isEmpty() ? QVariant() : QVariant(email));
-
+        insertQuery.bindValue(":phone", phone.isEmpty() ? QVariant() : QVariant(phone));
+        insertQuery.bindValue(":email", email.isEmpty() ? QVariant() : QVariant(email));
         insertQuery.bindValue(":age", ageValue);
         insertQuery.bindValue(":city_id", cityId);
         insertQuery.bindValue(":status_id", statusId);
-
         if (!insertQuery.exec()) {
             errorMessage = insertQuery.lastError().text();
             m_db.rollback();
             return false;
         }
-
         ++importedCount;
     }
-
-    // Сохраняем изменения
     if (!m_db.commit()) {
         errorMessage = m_db.lastError().text();
         m_db.rollback();
         return false;
     }
-
     errorMessage = "Импорт завершён";
-
     return true;
 }
